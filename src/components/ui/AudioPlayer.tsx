@@ -1,21 +1,71 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Play, Pause } from "lucide-react";
 
 interface AudioPlayerProps {
-  src: string;
+  /** Audio source URL. If not provided, onLoadRequest must be provided. */
+  src?: string;
+  /** Called when play is clicked and no src is loaded yet. Should return the audio URL. */
+  onLoadRequest?: () => Promise<string | null>;
   className?: string;
+  autoPlay?: boolean;
 }
 
-export const AudioPlayer: React.FC<AudioPlayerProps> = ({
-  src,
-  className = "",
+interface AudioPlayerGroupContextValue {
+  requestPlayback: (audio: HTMLAudioElement) => void;
+  releasePlayback: (audio: HTMLAudioElement) => void;
+}
+
+const AudioPlayerGroupContext =
+  createContext<AudioPlayerGroupContextValue | null>(null);
+
+export const AudioPlayerGroup: React.FC<React.PropsWithChildren> = ({
+  children,
 }) => {
+  const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const value = useMemo<AudioPlayerGroupContextValue>(
+    () => ({
+      requestPlayback: (audio) => {
+        if (activeAudioRef.current !== audio) activeAudioRef.current?.pause();
+        activeAudioRef.current = audio;
+      },
+      releasePlayback: (audio) => {
+        if (activeAudioRef.current === audio) activeAudioRef.current = null;
+      },
+    }),
+    [],
+  );
+
+  return (
+    <AudioPlayerGroupContext.Provider value={value}>
+      {children}
+    </AudioPlayerGroupContext.Provider>
+  );
+};
+
+export const AudioPlayer: React.FC<AudioPlayerProps> = ({
+  src: initialSrc,
+  onLoadRequest,
+  className = "",
+  autoPlay = false,
+}) => {
+  const group = useContext(AudioPlayerGroupContext);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(initialSrc ?? null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
+  const src = loadedSrc;
   const animationRef = useRef<number>();
   const dragTimeRef = useRef<number>(0);
 
@@ -78,12 +128,19 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     };
 
     const handleEnded = () => {
+      group?.releasePlayback(audio);
       setIsPlaying(false);
       setCurrentTime(audio.duration || 0);
     };
 
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
+    const handlePlay = () => {
+      group?.requestPlayback(audio);
+      setIsPlaying(true);
+    };
+    const handlePause = () => {
+      group?.releasePlayback(audio);
+      setIsPlaying(false);
+    };
 
     audio.addEventListener("loadedmetadata", handleLoadedMetadata);
     audio.addEventListener("ended", handleEnded);
@@ -91,12 +148,35 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     audio.addEventListener("pause", handlePause);
 
     return () => {
+      group?.releasePlayback(audio);
       audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
       audio.removeEventListener("ended", handleEnded);
       audio.removeEventListener("play", handlePlay);
       audio.removeEventListener("pause", handlePause);
     };
-  }, []);
+  }, [group]);
+
+  // Auto-play when src becomes available (via onLoadRequest or autoPlay prop)
+  const prevLoadedSrc = useRef<string | null>(null);
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    // Play when loadedSrc changes from null to a value (lazy load case)
+    if (loadedSrc && !prevLoadedSrc.current && onLoadRequest) {
+      audio.play().catch((error) => {
+        console.error("Auto-play failed:", error);
+      });
+    }
+    // Or when autoPlay is set with initial src
+    else if (autoPlay && initialSrc && !prevLoadedSrc.current) {
+      audio.play().catch((error) => {
+        console.error("Auto-play failed:", error);
+      });
+    }
+
+    prevLoadedSrc.current = loadedSrc;
+  }, [loadedSrc, autoPlay, initialSrc, onLoadRequest]);
 
   // Global drag handlers
   const handleMouseUp = useCallback(() => {
@@ -121,15 +201,36 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     }
   }, [isDragging, handleMouseUp]);
 
+  // Cleanup blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (loadedSrc?.startsWith("blob:")) {
+        URL.revokeObjectURL(loadedSrc);
+      }
+    };
+  }, [loadedSrc]);
+
   const togglePlay = async () => {
     const audio = audioRef.current;
     if (!audio) return;
+    if (isLoading) return;
 
     try {
       if (isPlaying) {
         audio.pause();
       } else {
-        await audio.play();
+        // If no src loaded yet, request it
+        if (!src && onLoadRequest) {
+          setIsLoading(true);
+          const newSrc = await onLoadRequest();
+          setIsLoading(false);
+          if (newSrc) {
+            setLoadedSrc(newSrc);
+            // Playback will be triggered by the useEffect watching loadedSrc
+          }
+        } else if (src) {
+          await audio.play();
+        }
       }
     } catch (error) {
       console.error("Playback failed:", error);
@@ -177,11 +278,12 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   return (
     <div className={`flex items-center gap-3 ${className}`}>
-      <audio ref={audioRef} src={src} preload="metadata" />
+      <audio ref={audioRef} src={src ?? undefined} preload="metadata" />
 
       <button
         onClick={togglePlay}
-        className="transition-colors cursor-pointer text-text hover:text-logo-primary"
+        disabled={isLoading}
+        className="transition-colors cursor-pointer text-text hover:text-logo-primary disabled:opacity-50"
         aria-label={isPlaying ? "Pause" : "Play"}
       >
         {isPlaying ? (

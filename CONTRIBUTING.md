@@ -2,6 +2,12 @@
 
 Thank you for your interest in contributing to Handy! This guide will help you get started with contributing to this open source speech-to-text application.
 
+## ⚠️ Feature Freeze
+
+**Handy is currently undergoing a feature freeze.** If you are submitting a PR which is a new feature that the community has not asked for, it will be rejected. If the community has asked for it, or you have explicitly gathered support, it may still be considered.
+
+**Bug fixes are the top priority.** There are 60+ issues to fix. Please focus your contributions on fixing bugs and improving stability.
+
 ## 📖 Philosophy
 
 Handy aims to be the most forkable speech-to-text app. The goal is to create both a useful tool and a foundation for others to build upon—a well-patterned, simple codebase that serves the community. We prioritize:
@@ -221,6 +227,16 @@ Community feedback is essential to keeping Handy the best it can be for everyone
      - Breaking changes (if any)
 
    **Remember:** PRs with community support are prioritized. If you haven't already, start a [discussion](https://github.com/cjpais/Handy/discussions) to gather feedback before or alongside your PR. It is not explicitly required to gather feedback, but it certainly helps your PR get merged faster.
+
+### AI Assistance Disclosure
+
+**AI-assisted PRs are welcome!** Use whatever tools help you contribute, just be upfront about it.
+
+In your PR description, please include:
+
+- Whether AI was used (yes/no)
+- Which tools were used (e.g., "Claude Code", "GitHub Copilot", "ChatGPT")
+- How extensively it was used (e.g., "generated boilerplate", "helped debug", "wrote most of the code")
 
 ### Code Style Guidelines
 

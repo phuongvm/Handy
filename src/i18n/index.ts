@@ -3,6 +3,11 @@ import { initReactI18next } from "react-i18next";
 import { locale } from "@tauri-apps/plugin-os";
 import { LANGUAGE_METADATA } from "./languages";
 import { commands } from "@/bindings";
+import {
+  getLanguageDirection,
+  updateDocumentDirection,
+  updateDocumentLanguage,
+} from "@/lib/utils/rtl";
 
 // Auto-discover translation files using Vite's glob import
 const localeModules = import.meta.glob<{ default: Record<string, unknown> }>(
@@ -47,12 +52,36 @@ export const SUPPORTED_LANGUAGES = Object.keys(resources)
 export type SupportedLanguageCode = string;
 
 // Check if a language code is supported
-const getSupportedLanguage = (
+export const getSupportedLanguage = (
   langCode: string | null | undefined,
 ): SupportedLanguageCode | null => {
   if (!langCode) return null;
-  const code = langCode.split("-")[0].toLowerCase();
-  const supported = SUPPORTED_LANGUAGES.find((lang) => lang.code === code);
+
+  const normalized = langCode.toLowerCase().replace(/_/g, "-");
+  const subtags = normalized.split("-");
+  const language = subtags[0];
+  const isHant = subtags.includes("hant");
+  const isHans = subtags.includes("hans");
+  const isTraditionalRegion = ["tw", "hk", "mo"].some((region) =>
+    subtags.includes(region),
+  );
+
+  // Try exact match first
+  let supported = SUPPORTED_LANGUAGES.find(
+    (lang) => lang.code.toLowerCase() === normalized,
+  );
+  if (!supported) {
+    let fallback = language;
+    if (language === "zh" && (isHant || (!isHans && isTraditionalRegion))) {
+      fallback = "zh-tw";
+    } else if (language === "yue") {
+      // Cantonese uses Traditional Chinese unless explicitly tagged as Hans.
+      fallback = isHans ? "zh" : "zh-tw";
+    }
+    supported = SUPPORTED_LANGUAGES.find(
+      (lang) => lang.code.toLowerCase() === fallback,
+    );
+  }
   return supported ? supported.code : null;
 };
 
@@ -94,5 +123,15 @@ export const syncLanguageFromSettings = async () => {
 
 // Run language sync on init
 syncLanguageFromSettings();
+
+// Listen for language changes to update HTML dir and lang attributes
+i18n.on("languageChanged", (lng) => {
+  const dir = getLanguageDirection(lng);
+  updateDocumentDirection(dir);
+  updateDocumentLanguage(lng);
+});
+
+// Re-export RTL utilities for convenience
+export { getLanguageDirection, isRTLLanguage } from "@/lib/utils/rtl";
 
 export default i18n;

@@ -1,42 +1,30 @@
 import React, { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { RefreshCcw } from "lucide-react";
 import { commands } from "@/bindings";
 
-import { SettingsGroup } from "../../ui/SettingsGroup";
-import { SettingContainer } from "../../ui/SettingContainer";
+import { Alert } from "../../ui/Alert";
+import {
+  Dropdown,
+  SettingContainer,
+  SettingsGroup,
+  Textarea,
+} from "@/components/ui";
 import { Button } from "../../ui/Button";
 import { ResetButton } from "../../ui/ResetButton";
 import { Input } from "../../ui/Input";
-import { Dropdown } from "../../ui/Dropdown";
-import { Textarea } from "../../ui/Textarea";
 
 import { ProviderSelect } from "../PostProcessingSettingsApi/ProviderSelect";
 import { BaseUrlField } from "../PostProcessingSettingsApi/BaseUrlField";
 import { ApiKeyField } from "../PostProcessingSettingsApi/ApiKeyField";
 import { ModelSelect } from "../PostProcessingSettingsApi/ModelSelect";
 import { usePostProcessProviderState } from "../PostProcessingSettingsApi/usePostProcessProviderState";
+import { ShortcutInput } from "../ShortcutInput";
 import { useSettings } from "../../../hooks/useSettings";
-
-const DisabledNotice: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => (
-  <div className="p-4 bg-mid-gray/5 rounded-lg border border-mid-gray/20">
-    <p className="text-sm text-mid-gray">{children}</p>
-  </div>
-);
 
 const PostProcessingSettingsApiComponent: React.FC = () => {
   const { t } = useTranslation();
   const state = usePostProcessProviderState();
-
-  if (!state.enabled) {
-    return (
-      <DisabledNotice>
-        {t("settings.postProcessing.disabledNotice")}
-      </DisabledNotice>
-    );
-  }
 
   return (
     <>
@@ -56,28 +44,12 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
         </div>
       </SettingContainer>
 
-      {state.appleIntelligenceUnavailable ? (
-        <div className="p-3 bg-red-500/10 border border-red-500/50">
-          <p className="text-sm text-red-500">
-            {t("settings.postProcessing.api.appleIntelligence.unavailable")}
-          </p>
-        </div>
-      ) : null}
-
       {state.isAppleProvider ? (
-        <SettingContainer
-          title={t("settings.postProcessing.api.appleIntelligence.title")}
-          description={t(
-            "settings.postProcessing.api.appleIntelligence.description",
-          )}
-          descriptionMode="tooltip"
-          layout="stacked"
-          grouped={true}
-        >
-          <DisabledNotice>
-            {t("settings.postProcessing.api.appleIntelligence.requirements")}
-          </DisabledNotice>
-        </SettingContainer>
+        state.appleIntelligenceUnavailable ? (
+          <Alert variant="error" contained>
+            {t("settings.postProcessing.api.appleIntelligence.unavailable")}
+          </Alert>
+        ) : null
       ) : (
         <>
           {state.selectedProvider?.id === "custom" && (
@@ -124,51 +96,49 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
         </>
       )}
 
-      <SettingContainer
-        title={t("settings.postProcessing.api.model.title")}
-        description={
-          state.isAppleProvider
-            ? t("settings.postProcessing.api.model.descriptionApple")
-            : state.isCustomProvider
+      {!state.isAppleProvider && (
+        <SettingContainer
+          title={t("settings.postProcessing.api.model.title")}
+          description={
+            state.isCustomProvider
               ? t("settings.postProcessing.api.model.descriptionCustom")
               : t("settings.postProcessing.api.model.descriptionDefault")
-        }
-        descriptionMode="tooltip"
-        layout="stacked"
-        grouped={true}
-      >
-        <div className="flex items-center gap-2">
-          <ModelSelect
-            value={state.model}
-            options={state.modelOptions}
-            disabled={state.isModelUpdating}
-            isLoading={state.isFetchingModels}
-            placeholder={
-              state.isAppleProvider
-                ? t("settings.postProcessing.api.model.placeholderApple")
-                : state.modelOptions.length > 0
+          }
+          descriptionMode="tooltip"
+          layout="stacked"
+          grouped={true}
+        >
+          <div className="flex items-center gap-2">
+            <ModelSelect
+              value={state.model}
+              options={state.modelOptions}
+              disabled={state.isModelUpdating}
+              isLoading={state.isFetchingModels}
+              placeholder={
+                state.modelOptions.length > 0
                   ? t(
                       "settings.postProcessing.api.model.placeholderWithOptions",
                     )
                   : t("settings.postProcessing.api.model.placeholderNoOptions")
-            }
-            onSelect={state.handleModelSelect}
-            onCreate={state.handleModelCreate}
-            onBlur={() => {}}
-            className="flex-1 min-w-[380px]"
-          />
-          <ResetButton
-            onClick={state.handleRefreshModels}
-            disabled={state.isFetchingModels || state.isAppleProvider}
-            ariaLabel={t("settings.postProcessing.api.model.refreshModels")}
-            className="flex h-10 w-10 items-center justify-center"
-          >
-            <RefreshCcw
-              className={`h-4 w-4 ${state.isFetchingModels ? "animate-spin" : ""}`}
+              }
+              onSelect={state.handleModelSelect}
+              onCreate={state.handleModelCreate}
+              onBlur={() => {}}
+              className="flex-1 min-w-[380px]"
             />
-          </ResetButton>
-        </div>
-      </SettingContainer>
+            <ResetButton
+              onClick={state.handleRefreshModels}
+              disabled={state.isFetchingModels}
+              ariaLabel={t("settings.postProcessing.api.model.refreshModels")}
+              className="flex h-10 w-10 items-center justify-center"
+            >
+              <RefreshCcw
+                className={`h-4 w-4 ${state.isFetchingModels ? "animate-spin" : ""}`}
+              />
+            </ResetButton>
+          </div>
+        </SettingContainer>
+      )}
     </>
   );
 };
@@ -181,7 +151,6 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
   const [draftName, setDraftName] = useState("");
   const [draftText, setDraftText] = useState("");
 
-  const enabled = getSetting("post_process_enabled") || false;
   const prompts = getSetting("post_process_prompts") || [];
   const selectedPromptId = getSetting("post_process_selected_prompt_id") || "";
   const selectedPrompt =
@@ -272,14 +241,6 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
     setDraftText("");
   };
 
-  if (!enabled) {
-    return (
-      <DisabledNotice>
-        {t("settings.postProcessing.disabledNotice")}
-      </DisabledNotice>
-    );
-  }
-
   const hasPrompts = prompts.length > 0;
   const isDirty =
     !!selectedPrompt &&
@@ -297,7 +258,7 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
       grouped={true}
     >
       <div className="space-y-3">
-        <div className="flex gap-2">
+        <div className="flex gap-2 min-w-0">
           <Dropdown
             selectedValue={selectedPromptId || null}
             options={prompts.map((p) => ({
@@ -313,13 +274,14 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
             disabled={
               isUpdating("post_process_selected_prompt_id") || isCreating
             }
-            className="flex-1"
+            className="flex-1 min-w-0"
           />
           <Button
             onClick={handleStartCreate}
             variant="primary"
             size="md"
             disabled={isCreating}
+            className="shrink-0"
           >
             {t("settings.postProcessing.prompts.createNew")}
           </Button>
@@ -353,12 +315,12 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
                   "settings.postProcessing.prompts.promptInstructionsPlaceholder",
                 )}
               />
-              <p
-                className="text-xs text-mid-gray/70"
-                dangerouslySetInnerHTML={{
-                  __html: t("settings.postProcessing.prompts.promptTip"),
-                }}
-              />
+              <p className="text-xs text-mid-gray/70">
+                <Trans
+                  i18nKey="settings.postProcessing.prompts.promptTip"
+                  components={{ code: <code /> }}
+                />
+              </p>
             </div>
 
             <div className="flex gap-2 pt-2">
@@ -383,7 +345,7 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
         )}
 
         {!isCreating && !selectedPrompt && (
-          <div className="p-3 bg-mid-gray/5 rounded border border-mid-gray/20">
+          <div className="p-3 bg-mid-gray/5 rounded-md border border-mid-gray/20">
             <p className="text-sm text-mid-gray">
               {hasPrompts
                 ? t("settings.postProcessing.prompts.selectToEdit")
@@ -420,12 +382,12 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
                   "settings.postProcessing.prompts.promptInstructionsPlaceholder",
                 )}
               />
-              <p
-                className="text-xs text-mid-gray/70"
-                dangerouslySetInnerHTML={{
-                  __html: t("settings.postProcessing.prompts.promptTip"),
-                }}
-              />
+              <p className="text-xs text-mid-gray/70">
+                <Trans
+                  i18nKey="settings.postProcessing.prompts.promptTip"
+                  components={{ code: <code /> }}
+                />
+              </p>
             </div>
 
             <div className="flex gap-2 pt-2">
@@ -467,6 +429,14 @@ export const PostProcessingSettings: React.FC = () => {
 
   return (
     <div className="max-w-3xl w-full mx-auto space-y-6">
+      <SettingsGroup title={t("settings.postProcessing.hotkey.title")}>
+        <ShortcutInput
+          shortcutId="transcribe_with_post_process"
+          descriptionMode="tooltip"
+          grouped={true}
+        />
+      </SettingsGroup>
+
       <SettingsGroup title={t("settings.postProcessing.api.title")}>
         <PostProcessingSettingsApi />
       </SettingsGroup>
